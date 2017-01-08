@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Kadcon-Kontoauszug</title>
+  <script src="res/sweetalert.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="res/sweetalert.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.2.1/material.indigo-pink.min.css">
+  <script defer src="https://code.getmdl.io/1.2.1/material.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+  <script src="res/chosen.jquery.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="res/chosen.min.css">
+  <style>
+      .data-list {
+          width: 100%;
+      }
+  </style>
+    <script langauage="javascript">
+        function setValue(key, value) {
+            if(key && value && typeof key === 'string')
+                window.localStorage.setItem(key, ((typeof value === 'object')? JSON.stringify(value) : value));
+
+            return "";
+        }
+
+        function getValue(key, defaultValue) {
+            if(key && typeof key === 'string') {
+                var value = window.localStorage.getItem(key);
+                if(value) return value;
+                else if (defaultValue) return defaultValue;
+                else return "";
+            }
+        }
+
+        function removeValue(key) {
+            if(key && typeof key === 'string') window.localStorage.removeItem(key);
+            return "";
+        }
+
+        function loadSettings() {
+            var pages = document.getElementById("pages");
+
+            $('#pages').chosen({disable_search_threshold: 5});
+            pages.value = getValue('pages', 1);
+            $('#pages').trigger("chosen:updated");
+        }
+
+        function saveSettings() {
+            var token = document.getElementById("token").value,
+                pages = document.getElementById("pages").value;
+
+            // check if new token submitted
+            if(token && token.length) {
+                // encrypt entered token
+                $.post("https://vserver.legendskyfall.de/kontoauszug/token.php", {token: token}, function(data) {
+                    if(data) setValue('token', data);
+                    else swal("Oh..", "Da ist etwas schiefgelaufen", "error");
+                });
+            }
+            // save pages
+            setValue('pages', pages);
+            // show success message
+            swal("Erfolgreich!", "Die neuen Einstellungen wurden übernommen", "success");
+        }
+    </script>
+</head>
+
+<body onload="loadSettings()">
+    <!-- Always shows a header, even in smaller screens. -->
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+            <div class="mdl-layout__header-row">
+                <!-- Title -->
+                <span class="mdl-layout-title">Einstellungen</span>
+            </div>
+        </header>
+        <div class="mdl-layout__drawer">
+            <span class="mdl-layout-title">&nbsp;</span>
+            <nav class="mdl-navigation">
+                <a class="mdl-navigation__link" href="index.html">Kontoauszug</a>
+                <a class="mdl-navigation__link" href="filter.html">Filter</a>
+                <a class="mdl-navigation__link" href="stats.html">Analyse</a>
+                <a class="mdl-navigation__link" href="settings.html">Einstellungen</a>
+            </nav>
+        </div>
+        <main class="mdl-layout__content">
+            <div class="page-content">
+                <!-- Your content goes here -->
+                <!-- Textfield with Floating Label -->
+                <form style="margin-left: 2%; margin-top: 5%" action="#">
+                    <div style="width: 100%" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                        <input class="mdl-textfield__input" type="text" id="token">
+                        <label class="mdl-textfield__label" for="token">Neuer Kontoauszugs-Token...</label>
+                    </div>
+                    <span>Anzahl der zu analysierenden und anzuzeigenden Einträge*</span>
+                    <select id="pages" style="width: 15%">
+                      <option value="1">250</option>
+                      <option value="2">500</option>
+                      <option value="3">750</option>
+                      <option value="4">1000</option>
+                    </select>
+                    <br><br>
+                    <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="checkbox-1">
+                      <input type="checkbox" id="checkbox-1" class="mdl-checkbox__input" checked disabled>
+                      <span class="mdl-checkbox__label">Anonyme Daten übermitteln, um unsere Dienste verbessern zu können.**</span>
+                    </label>
+                    <br><br>
+                    <span style="color: red; font-style: italic">* Mehr Daten sorgen für eine genauere Statistik, zugleich sorgen sie aber auch für ein erhöhtes Datenaufkommen.</span>
+                    <br><br>
+                    <span style="color: red; font-style: italic">** Zurzeit werden noch keine Daten erhoben.</span>
+                    <br><br>
+                    <!-- Accent-colored raised button with ripple -->
+                    <button style="width: 100%" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored" onclick="event.preventDefault(); saveSettings()">
+                     Einstellungen übernehmen
+                  </button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
