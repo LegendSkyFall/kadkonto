@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Kadcon-Kontoauszug</title>
+    <script src="res/sweetalert.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="res/sweetalert.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.2.1/material.indigo-pink.min.css">
+    <script defer src="https://code.getmdl.io/1.2.1/material.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src="res/chosen.jquery.min.js"></script>
+    <script src="res/lz-string.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="res/chosen.min.css">
+    <style>
+        .data-list {
+            width: 100%;
+        }
+    </style>
+    <script language="javascript">
+        // detect protocol and force redirect if not on https to prevent request blocking
+        if (location.protocol !== 'https:') location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
+
+        function setValue(key, value) {
+            if(key && value && typeof key === 'string')
+                window.localStorage.setItem(key, ((typeof value === 'object')? JSON.stringify(value) : value));
+
+            return "";
+        }
+
+        function getValue(key, defaultValue) {
+            if(key && typeof key === 'string') {
+                var value = window.localStorage.getItem(key);
+                if(value) return value;
+                else if (defaultValue) return defaultValue;
+                else return "";
+            }
+        }
+
+        function removeValue(key) {
+            if(key && typeof key === 'string') window.localStorage.removeItem(key);
+            return "";
+        }
+
+        function filter() {
+            if(getValue('filter', false)) {
+                var filter = JSON.parse(getValue('filter'));
+            }
+            swal({
+                title: "Gesetzter Filter",
+                text: ((filter)?
+                    '<i class=\'material-icons\' style=\'border: 1px solid\' onclick=\'removeValue(\"filter\"); swal.close(); readout()\'>delete</i>' +
+                    '<p>Konto: ' + filter.account + '</p>' +
+                    '<p>Handelspartner: ' + filter.partner + '</p>' +
+                    '<p>Server: ' + filter.server + '</p>' +
+                    '<p>Typ: ' + filter.type + '</p>' +
+                    '<p>Betrag von: ' + filter.min + ' bis ' + filter.max + ' Kadis</p>'
+                : 'Kein Filter gesetzt.'),
+                html: true
+            });
+        }
+
+        function reset() {
+            // function to reset localStorage
+            swal({
+              title: "Fortfahren?",
+              text: "Alle Daten von diesem Gerät werden lokal gelöscht. Du musst den Token und Deine Einstellungen danach wieder eingeben. Diese Funktion kann bei Fehlern helfen.",
+              type: "warning",
+              showCancelButton: true,
+              confirmButtonColor: "#DD6B55",
+              confirmButtonText: "Daten löschen",
+              cancelButtonText: "Abbrechen",
+              closeOnConfirm: false
+            },
+            function(){
+              swal("Gelöscht!", "Alle lokalen Daten wurden gelöscht.", "success");
+              localStorage.clear();
+              setTimeout(function () {
+                  readout();
+              }, 2000);
+            });
+        }
+
+        function readout() {
+            // check cookie
+            var token = getValue('token');
+
+            if (token !== "") {
+                // proceed with readout
+                // spam prevention
+                if (typeof FAIL === 'undefined') FAIL = 0;
+                // first start detection
+                if(typeof FIRST_START === 'undefined') FIRST_START = true;
+                // new data detection to skip checksum verification
+                if(typeof NEW_DATA === 'undefined') NEW_DATA = true;
+                // show loading bar
+                document.getElementById("loading").style.display = "block";
+
+                $.post("https://vserver.legendskyfall.de/kontoauszug/index.php", {token: getValue('token'), filter: getValue('filter'), pages: getValue('pages')}, function(data) {
+                    var countEntries = data.length,
+                        playerAccounts = [];
+
+                    // save compressed data to localStorage
+                    setValue('compressedData', LZString.compressToBase64(JSON.stringify(data)));
+
+                    if(NEW_DATA) {
+                        // clear existing rows
+                        var dataList = document.getElementById("dataList");
+
+                        while (dataList.firstChild) {
+                            dataList.removeChild(dataList.firstChild);
+                        }
+                    }
+
+                    if(countEntries <= 1 && getValue('filter')) swal("Keine Ergebnisse", "Passe den Filter ggf. entsprechend an.", "info");
+
+                    // date convert function to allow compatibility for old and bad browsers
+                    function convertDate(dateString) {
+                        var parts = dateString.match(/\d+/g),
+                            isoTime = Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]);
+
+                        return new Date(isoTime);
+                    }
+
+                    $.each(data, function(key, val) {
+                        // iterate through each received data, except through the checksum
+                        if(val.hasOwnProperty('crc32')) {
+                            // update checksum if differs
+                            // BUG crc32 is 0 sometimes <-- invalid
+                            if(val.crc32 != getValue('crc32', 0) && val.crc32 !== 0) {
+                                setValue('crc32', val.crc32);
+                                NEW_DATA = true;
+                                readout();
+                            } else NEW_DATA = false;
+                        } else if(val.hasOwnProperty('accounts')) {
+                            // register account
+                            playerAccounts.push(val.accounts);
+                            // update/save accounts
+                            setValue('accounts', JSON.stringify(playerAccounts));
+                        } else {
+                            // check if new data detected
+                            if(NEW_DATA) {
+                                // proceed with iteration
+                                // dom variables preparation
+                                var line = document.createElement('li'),
+                                    primaryContent = document.createElement('span'),
+                                    icon = document.createElement('i'),
+                                    username = document.createElement('span'),
+                                    subTitle = document.createElement('span'),
+                                    secondaryContent = document.createElement('span'),
+                                    dateTime = document.createElement('span'),
+                                    amount = document.createElement('span'),
+                                    date = convertDate(val.Datum),
+                                    dateSeconds = date.getSeconds(),
+                                    dateMinutes = date.getMinutes(),
+                                    dateHours = date.getHours(),
+                                    dateDay = date.getDate(),
+                                    dateMonth = date.getMonth() + 1,
+                                    dateYear = date.getFullYear(),
+                                    dateFormat = dateDay + '.' + dateMonth + '.' + dateYear,
+                                    detailDateFormat = dateFormat + ' ' + dateHours + ':' + dateMinutes + ':' + dateSeconds;
+
+                                // add classes and style
+                                line.className = 'mdl-list__item mdl-list__item--two-line';
+                                primaryContent.className = 'mdl-list__item-primary-content';
+                                icon.className = 'material-icons mdl-list__item-avatar';
+                                subTitle.className = 'mdl-list__item-sub-title';
+                                secondaryContent.className = 'mdl-list__item-secondary-content';
+                                dateTime.className = 'mdl-list__item-secondary-info';
+                                dateTime.style.fontStyle = 'italic';
+                                amount.className = 'mdl-list__item-secondary-info';
+                                amount.style.fontWeight = 'bold';
+                                if (val.Gutschrift === '') {
+                                    amount.style.color = 'darkred';
+                                } else {
+                                    amount.style.color = 'darkgreen';
+                                }
+
+                                console.log(data[key], key);
+
+                                // apply values
+                                if (val.Spieler !== '[Server]' && val.Spieler.charAt(0) !== '*') {
+                                    var getAvatar = 'https://cravatar.eu/avatar/' + val.Spieler + '.png';
+                                    icon.style.backgroundImage = 'url(' + getAvatar + ')';
+                                    icon.style.backgroundRepeat = 'no-repeat';
+                                    icon.style.backgroundSize = 'contain';
+                                } else {
+                                    icon.innerHTML = 'person';
+                                }
+                                username.innerHTML = val.Spieler;
+                                subTitle.innerHTML = val.Beschreibung;
+                                dateTime.innerHTML = dateFormat;
+                                amount.innerHTML = ((val.Gutschrift === '') ? '- ' : '+ ') + val.Betrag + ' Kadis';
+
+                                // detect voting and income and change subtitle
+                                if(val.Typ === 'Vote(0)' || val.Typ === 'Vote(1)') subTitle.innerHTML = 'Votebelohnung';
+                                else if(val.Typ === 'GEK') subTitle.innerHTML = 'Grundeinkommen';
+
+                                // build new row
+                                dataList.appendChild(line);
+                                line.appendChild(primaryContent);
+                                line.onclick = function () {
+                                     document.querySelector('#entryInfo').MaterialSnackbar.showSnackbar({
+                                        message: detailDateFormat + ' - Konto: ' + val.Konto + ' - Typ: ' + val.Typ + ' Neuer Saldo: ' + val.Saldo + ' Kadis',
+                                        timeout: 7777,
+                                    });
+                                };
+                                primaryContent.appendChild(icon);
+                                primaryContent.appendChild(username);
+                                primaryContent.appendChild(subTitle);
+                                line.appendChild(secondaryContent);
+                                secondaryContent.appendChild(dateTime);
+                                secondaryContent.appendChild(amount);
+
+                                // show message new entries and set received data to true and first start to false
+                                if(key === countEntries - 2 &&!FIRST_START) {
+                                    document.querySelector('#newEntry').MaterialSnackbar.showSnackbar({
+                                        message: 'Es gibt neue Einträge'
+                                    });
+                                }
+                                if(key === countEntries - 2 && FIRST_START) FIRST_START = false;
+                            } else {
+                                // show message no new entries
+                                if(key === countEntries - 2 && !NEW_DATA) {
+                                    document.querySelector('#newEntry').MaterialSnackbar.showSnackbar({
+                                        message: 'Es gibt keine neuen Einträge'
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }, 'json').done(function(json) {
+                    setTimeout(function() {
+                        document.getElementById("loading").style.display = "none";
+                        // reset fails
+                        FAIL = 0;
+                    }, 1234);
+                    console.log("Fertig!");
+                }).fail(function(error) {
+                    console.log("Fehler!");
+                    FAIL++;
+                    if (FAIL < 3) {
+                        readout();
+                    } else {
+                        swal("Auslesen fehlerhaft", "Bitte überprüfe den Token und achte darauf, nicht so häufig neue Anfragen zu stellen.", "error");
+                        document.getElementById("loading").style.display = "none";
+                    }
+                });
+            } else {
+                // wait for user to enter token
+                swal({
+                        title: "Gleich geht's los!",
+                        text: "Bitte gib vorher noch Deinen Token an:",
+                        type: "input",
+                        showCancelButton: false,
+                        closeOnConfirm: false,
+                        showLoaderOnConfirm: true,
+                        animation: "slide-from-top",
+                        inputPlaceholder: "Dein Token.."
+                    },
+                    function(inputValue) {
+                        setTimeout(function() {
+                            // check user input
+                            if (inputValue === false) return false;
+
+                            if (inputValue === "") {
+                                swal.showInputError("Der Token darf nicht leer sein.");
+                                return false
+                            }
+                            // encrypt entered token
+                            $.post("https://vserver.legendskyfall.de/kontoauszug/token.php", {token: inputValue}, function(data) {
+                                console.log(data);
+                                // save returrned encrypted token
+                                if(data) {
+                                    // save returned encrypted token
+                                    setValue('token', data);
+                                    // show message to user
+                                    swal('Super!', 'Der Token wurde gesetzt,', 'success');
+                                    // readout
+                                    readout();
+                                } else swal('Oh!', 'Da ist etwas schiefgelaufen', 'error');
+                            });
+                        }, 1234);
+                    });
+            }
+        }
+    </script>
+</head>
+
+<body onload="readout()">
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+            <div class="mdl-layout__header-row">
+                <span class="mdl-layout-title">Kontoauszug</span>
+                <div class="mdl-layout-spacer"></div>
+                <label class="mdl-button mdl-js-button mdl-button--icon" style="margin-right: 3%">
+                <i class="material-icons" onclick="reset()">delete_forever</i>
+              </label>
+                <label class="mdl-button mdl-js-button mdl-button--icon" style="margin-right: 3%">
+                <svg style="width:24px;height:24px" viewBox="0 0 24 24" onclick="filter()">
+                  <path fill="#FFF" d="M3,2H21V2H21V4H20.92L14,10.92V22.91L10,18.91V10.91L3.09,4H3V2Z" />
+                </svg>
+              </label>
+                <label class="mdl-button mdl-js-button mdl-button--icon">
+                <i class="material-icons" onclick="readout()">refresh</i>
+              </label>
+            </div>
+        </header>
+        <div class="mdl-layout__drawer">
+            <span class="mdl-layout-title">&nbsp;</span>
+            <nav class="mdl-navigation">
+                <a class="mdl-navigation__link" href="index.html">Kontoauszug</a>
+                <a class="mdl-navigation__link" href="filter.html">Filter</a>
+                <a class="mdl-navigation__link" href="stats.html">Analyse</a>
+                <a class="mdl-navigation__link" href="settings.html">Einstellungen</a>
+            </nav>
+        </div>
+        <main class="mdl-layout__content" id="main">
+            <div class="page-content">
+                <div id="loading" style="width: 100%" class="mdl-progress mdl-js-progress mdl-progress__indeterminate"></div>
+                <ul class="data-list mdl-list" id="dataList">
+                </ul>
+                <div id="newEntry" class="mdl-js-snackbar mdl-snackbar">
+                    <div class="mdl-snackbar__text"></div>
+                    <button class="mdl-snackbar__action" type="button"></button>
+                </div>
+                <div id="entryInfo" class="mdl-js-snackbar mdl-snackbar">
+                    <div class="mdl-snackbar__text"></div>
+                    <button class="mdl-snackbar__action" type="button"></button>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
