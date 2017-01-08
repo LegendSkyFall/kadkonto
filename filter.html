@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Kadcon-Kontoauszug</title>
+    <script src="res/sweetalert.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="res/sweetalert.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.2.1/material.indigo-pink.min.css">
+    <script defer src="https://code.getmdl.io/1.2.1/material.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src="res/chosen.jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="res/chosen.min.css">
+    <style>
+        .data-list {
+            width: 100%;
+        }
+    </style>
+    <script langauage="javascript">
+        function setValue(key, value) {
+            if(key && value && typeof key === 'string')
+                window.localStorage.setItem(key, ((typeof value === 'object')? JSON.stringify(value) : value));
+
+            return "";
+        }
+
+        function getValue(key, defaultValue) {
+            if(key && typeof key === 'string') {
+                var value = window.localStorage.getItem(key);
+                if(value) return value;
+                else if (defaultValue) return defaultValue;
+                else return "";
+            }
+        }
+
+        function removeValue(key) {
+            if(key && typeof key === 'string') window.localStorage.removeItem(key);
+            return "";
+        }
+
+        function loadFilter() {
+            $(function() {
+                // beautify select
+                $('#account').chosen({disable_search_threshold: 5});
+                $('#server').chosen({disable_search_threshold: 5});
+                $('#type').chosen({disable_search_threshold: 5});
+                // apply saved values
+                var partner = document.getElementById("partner"),
+                    partnerDiv = document.getElementById("partnerDiv"),
+                    accountList = document.getElementById("account"),
+                    server = document.getElementById("server"),
+                    type = document.getElementById("type"),
+                    min = document.getElementById("min"),
+                    minDiv = document.getElementById("minDiv"),
+                    max = document.getElementById("max"),
+                    maxDiv = document.getElementById("maxDiv"),
+                    filter = ((getValue('filter', false))? JSON.parse(getValue('filter')) : false);
+
+                // display all accounts
+                JSON.parse(getValue('accounts', [])).forEach(function(account) {
+                    var accountElement = document.createElement("option");
+
+                    accountElement.innerText = account;
+                    accountList.appendChild(accountElement);
+                });
+                // trigger refresh
+                $('#account').trigger("chosen:updated");
+
+                // apply values
+                if(filter) {
+                    partner.value = filter.partner;
+                    account.value = filter.account;
+                    server.value = filter.server;
+                    $('#server').trigger("chosen:updated");
+                    type.value = filter.type;
+                    $('#type').trigger("chosen:updated");
+                    min.value = filter.min;
+                    max.value = filter.max;
+                    partnerDiv.className += " is-focused";
+                    minDiv.className += " is-focused";
+                    maxDiv.className += " is-focused";
+                }
+            });
+        }
+
+        function saveFilter() {
+            var partner = document.getElementById("partner"),
+                account = document.getElementById("account"),
+                server = document.getElementById("server"),
+                type = document.getElementById("type"),
+                min = document.getElementById("min"),
+                max = document.getElementById("max");
+
+            // save complete filter
+            setValue('filter', {
+                partner: partner.value,
+                account: account.value,
+                server: server.value,
+                type: type.value,
+                min: min.value,
+                max: max.value
+            });
+
+            // show success message
+            swal("Gespeichert!", "Der Filter wurde übernommen.", "success")
+        }
+    </script>
+</head>
+
+<body onload="loadFilter()">
+    <!-- Always shows a header, even in smaller screens. -->
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+            <div class="mdl-layout__header-row">
+                <!-- Title -->
+                <span class="mdl-layout-title">Filter</span>
+            </div>
+        </header>
+        <div class="mdl-layout__drawer">
+            <span class="mdl-layout-title">&nbsp;</span>
+            <nav class="mdl-navigation">
+                <a class="mdl-navigation__link" href="index.html">Kontoauszug</a>
+                <a class="mdl-navigation__link" href="filter.html">Filter</a>
+                <a class="mdl-navigation__link" href="stats.html">Analyse</a>
+                <a class="mdl-navigation__link" href="settings.html">Einstellungen</a>
+            </nav>
+        </div>
+        <main class="mdl-layout__content">
+            <div class="page-content">
+                <!-- Your content goes here -->
+                <!-- Textfield with Floating Label -->
+                <form style="margin-left: 2%; margin-top: 5%" action="#">
+                    <div style="width: 100%" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" id="partnerDiv">
+                        <input class="mdl-textfield__input" type="text" id="partner">
+                        <label class="mdl-textfield__label" for="partner">Handelspartner...</label>
+                    </div>
+                    <select id="account">
+                      <option value="">Alle Konten</option>
+                    </select>
+                    <select id="server">
+                      <option value="">Alle Server</option>
+                      <option value="10000">Lobby</option>
+                      <option value="10100">Server 1</option>
+                      <option value="10200">Server 2</option>
+                      <option value="10300">Server 3</option>
+                      <option value="10400">Server 4</option>
+                      <option value="25565">Global</option>
+                    </select>
+                    <select id="type">
+                      <option value="">Alle Typen</option>
+                      <option value="PowerSign">PowerSign</option>
+                      <option value="ChestShop">ChestShop</option>
+                      <option value="GEK">GEK</option>
+                      <option value="Vote(0)">Vote(0)</option>
+                      <option value="Vote(1)">Vote(1)</option>
+                      <option value="iConomy">iConomy</option>
+                      <option value="KBank">KBank</option>
+                    </select>
+                    </div>
+                    <div style="width: 100%; margin-left: 2%" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" id="minDiv">
+                      <input class="mdl-textfield__input" type="number" pattern="-?[0-9]*(\.[0-9]+)?" id="min">
+                      <label class="mdl-textfield__label" for="min">Mindestbestrag...</label>
+                      <span class="mdl-textfield__error">Ungültiger Betrag!</span>
+                    </div>
+                    <div style="width: 100%; margin-left: 2%" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" id="maxDiv">
+                      <input class="mdl-textfield__input" type="number" pattern="-?[0-9]*(\.[0-9]+)?" id="max">
+                      <label class="mdl-textfield__label" for="max">Maximalbetrag...</label>
+                      <span class="mdl-textfield__error">Ungültiger Betrag</span>
+                    </div>
+                    <!-- Accent-colored raised button with ripple -->
+                    <button style="width: 100%" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored" onclick="event.preventDefault(); saveFilter()">
+                     Filter setzen
+                  </button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
