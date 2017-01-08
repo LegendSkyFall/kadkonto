@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Kadcon-Kontoauszug</title>
+  <script src="res/sweetalert.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="res/sweetalert.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.2.1/material.indigo-pink.min.css">
+  <script defer src="https://code.getmdl.io/1.2.1/material.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+  <script src="res/chosen.jquery.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="res/chosen.min.css">
+  <script src="res/lz-string.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+  <script type="text/javascript">
+  function setValue(key, value) {
+      if(key && value && typeof key === 'string')
+          window.localStorage.setItem(key, ((typeof value === 'object')? JSON.stringify(value) : value));
+
+      return "";
+  }
+
+  function getValue(key, defaultValue) {
+      if(key && typeof key === 'string') {
+          var value = window.localStorage.getItem(key);
+          if(value) return value;
+          else if (defaultValue) return defaultValue;
+          else return "";
+      }
+  }
+
+  function removeValue(key) {
+      if(key && typeof key === 'string') window.localStorage.removeItem(key);
+      return "";
+  }
+  </script>
+    <style>
+    .demo-card-wide.mdl-card {
+    width: 100%;
+    }
+    </style>
+</head>
+<body onload="changeChart(true)">
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+            <div class="mdl-layout__header-row">
+                <span class="mdl-layout-title">Analyse</span>
+            </div>
+        </header>
+        <div class="mdl-layout__drawer">
+            <span class="mdl-layout-title">&nbsp;</span>
+            <nav class="mdl-navigation">
+                <a class="mdl-navigation__link" href="index.html">Kontoauszug</a>
+                <a class="mdl-navigation__link" href="filter.html">Filter</a>
+                <a class="mdl-navigation__link" href="stats.html">Analyse</a>
+                <a class="mdl-navigation__link" href="settings.html">Einstellungen</a>
+            </nav>
+        </div>
+        <main class="mdl-layout__content" id="main">
+            <div class="page-content">
+                <div id="loading" style="width: 100%" class="mdl-progress mdl-js-progress mdl-progress__indeterminate"></div>
+                <div class="demo-card-wide mdl-card mdl-shadow--2dp">
+                  <div class="mdl-card__title">
+                    <h2 class="mdl-card__title-text" id="chartTitle">Einnahmen/Ausgaben</h2>
+                  </div>
+                  <div class="mdl-card__supporting-text">
+                      <canvas id="barChart" width="500px" height="500px" style="display: none"></canvas>
+                      <canvas id="lineChart" width="500px" height="500px" style="display: none"></canvas>
+                    <script>
+                    function changeChart(onLoaded) {
+                        document.getElementById("loading").style.display = "block";
+
+                        var changeTo = false,
+                            data = false,
+                            chart = false,
+                            chartBtn = document.getElementById('toggleChart'),
+                            decompressedData = false,
+                            filterDate = new Date();
+
+                        // change chart view based on icon
+                        if(chartBtn.children[0].innerText === 'show_chart' && !onLoaded) changeTo = 'line';
+                        else changeTo = 'bar';
+
+                        // extract required data from compressed data
+                        if(getValue('compressedData')) decompressedData = JSON.parse(LZString.decompressFromBase64(getValue('compressedData')))
+                        // use specific data, build custom filter
+                        if(changeTo === 'bar') {
+                            var plus = [],
+                                minus = [];
+
+                            // prepare array
+                            for(var i=0; i<3; i++) {
+                                plus[i] = [];
+                                minus[i] = [];
+                            }
+
+                            // prepare filter
+                            filterDate.setMonth(filterDate.getMonth() - 2);
+                            filterDate.setDate(1);
+                            filterDate.setHours(0,0,0,0);
+                            // fetch data based on filter (iterate and check date)
+                            decompressedData.forEach(function(curData) {
+                                var curDate = new Date(curData.Datum);
+
+                                if(curDate >= filterDate && curDate <= new Date()) {
+                                    var calcIndex = curDate.getMonth() - filterDate.getMonth();
+                                    // check if plus or minus
+                                    if(curData.Gutschrift === '') minus[((calcIndex >= 0)? calcIndex : 12 - filterDate.getMonth() - curDate.getMonth())].push(curData.Betrag);
+                                    else plus[((calcIndex >= 0)? calcIndex : 12 - filterDate.getMonth() - curDate.getMonth())].push(curData.Betrag);
+                                }
+                            });
+                            // calculate total for plus
+                            plus.forEach(function(allAmounts, curIdx) {
+                                plus[curIdx].total = 0;
+                                allAmounts.forEach(function(amount) {
+                                    plus[curIdx].total += parseFloat(amount);
+                                });
+                            });
+                            // calculate total for minus
+                            minus.forEach(function(allAmounts, curIdx) {
+                                minus[curIdx].total = 0;
+                                allAmounts.forEach(function(amount) {
+                                    minus[curIdx].total += parseFloat(amount);
+                                });
+                            });
+
+                            var monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+                                today = new Date();
+
+                            // build data object
+                            data = {
+                                labels: [monthNames[filterDate.getMonth()], monthNames[((filterDate.getMonth() === 12)? 0 : filterDate.getMonth() + 1)], monthNames[today.getMonth()]],
+                                datasets: [
+                                    {
+                                        label: "Einnahmen",
+                                        backgroundColor: "green",
+                                        data: [parseFloat(plus[0].total.toFixed(2)), parseFloat(plus[1].total.toFixed(2)), parseFloat(plus[2].total.toFixed(2))]
+                                    },
+                                    {
+                                        label: "Ausgaben",
+                                        backgroundColor: "red",
+                                        data: [parseFloat(minus[0].total.toFixed(2)), parseFloat(minus[1].total.toFixed(2)), parseFloat(minus[2].total.toFixed(2))]
+                                    }
+                                ]
+                            };
+                        } else {
+                            var filterDate = new Date(new Date().setHours(0, 0, 0, 0)),
+                                days = [],
+                                max = [],
+                                accounts = {},
+                                data = false,
+                                dataset = [],
+                                decompressedData = false;
+
+                            // prepare days array
+                            for(var i=0; i<7; i++) days[i] = [];
+
+                            // extract required data from compressed data
+                            if(getValue('compressedData')) decompressedData = JSON.parse(LZString.decompressFromBase64(getValue('compressedData')))
+
+                            // set filter
+                            filterDate.setDate(filterDate.getDate() -6);
+                            // fetch data based on filter (iterate and check date)
+                            decompressedData.forEach(function(curData) {
+                                var curDate = new Date(curData.Datum),
+                                    curAccount = curData.Konto,
+                                    curSaldo = curData.Saldo;
+
+                                if(curDate >= filterDate && curDate <= new Date()) {
+                                    // BUG
+                                    // days[curDate.getDate() - filterDate.getDate()].push({[curAccount]: parseFloat(curSaldo)});
+                                    // FIXME
+                                    var calcIndex = curDate.getMonth() - filterDate.getMonth();
+                                    // push to specific day
+                                    days[((calcIndex >=0)? calcIndex : 12 - filterDate.getMonth() - curDate.getMonth())].push({[curAccount]: parseFloat(curSaldo)});
+                                    console.log(curData);
+                                }
+                            });
+
+                            days.forEach(function(day,i) {
+                                max[i] = {};
+                                day.forEach(function(item) {
+                                    for(var key in item) {
+                                        accounts[key.trim()] = true;
+                                        max[i][key.trim()] = Math.max(max[i][key.trim()]|0, item[key.trim()]);
+                                     }
+                                });
+                            });
+                            console.log(max, accounts);
+
+                            // iterate through every account and fetch all data
+                            for(var account in accounts) {
+                                console.log(account);
+                                // prepare datasetObj
+                                var datasetObj = {
+                                    label: account,
+                                    fill: false,
+                                    lineTension: 0,
+                                    borderColor: '#'+(0x1000000+(Math.random())*0xffffff).toString(16).substr(1,6),
+                                    data: []
+                                };
+
+                                // iterate through every day
+                                var prevValue = 0;
+                                max.forEach(function(curAccount) {
+                                    if(typeof curAccount[account] !== "undefined") {
+                                        datasetObj.data.push(curAccount[account]);
+                                        prevValue = curAccount[account];
+                                    } else {
+                                        if(prevValue !== 0) datasetObj.data.push(prevValue);
+                                        else datasetObj.data.push(0);
+                                    }
+                                });
+                                console.log(datasetObj);
+                                dataset.push(datasetObj);
+                            }
+
+                            var today = new Date(),
+                                label = [];
+
+                            for(var i=6; i>=0; i--) {
+                                var calcDate = new Date().setDate(new Date(today).getDate() - i);
+
+                                calcDate = new Date(calcDate);
+                                label.push(calcDate.getDate() + "." + (calcDate.getMonth() + 1));
+                            }
+
+                            data = {
+                                labels: label,
+                                datasets: dataset
+                            };
+                        }
+                        // get chart element
+                        chart = document.getElementById(((changeTo === 'bar')? 'barChart' : 'lineChart'));
+                        // create chart
+                        var buildChart = new Chart(chart,{
+                            type: ((changeTo === 'bar')? 'bar' : 'line'),
+                            data: data
+                        });
+                        // show / hide charts, change icon and title
+                        if(changeTo === 'line') {
+                            chartBtn.children[0].innerText = 'undo';
+                            document.getElementById('lineChart').style.display = 'block';
+                            document.getElementById('barChart').style.display = 'none';
+                            document.getElementById('chartTitle').innerText = 'Kontostandsverlauf';
+                        } else {
+                            chartBtn.children[0].innerText = 'show_chart';
+                            document.getElementById('barChart').style.display = 'block';
+                            document.getElementById('lineChart').style.display = 'none';
+                            document.getElementById('chartTitle').innerText = 'Einnahmen/Ausgaben';
+                        }
+                        setTimeout(function() {
+                            document.getElementById("loading").style.display = "none";
+                        }, 1234);
+                    }
+                    </script>
+                  </div>
+                  <div class="mdl-card__menu">
+                    <button id="toggleChart" class="mdl-button mdl-button--icon mdl-js-button mdl-js-ripple-effect" onclick="changeChart()">
+                      <i class="material-icons">show_chart</i>
+                    </button>
+                  </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
