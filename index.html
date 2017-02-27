@@ -20,9 +20,6 @@
         }
     </style>
     <script language="javascript">
-        // detect protocol and force redirect if not on https to prevent request blocking
-        if (location.protocol !== 'https:') location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
-
         function setValue(key, value) {
             if(key && value && typeof key === 'string')
                 window.localStorage.setItem(key, ((typeof value === 'object')? JSON.stringify(value) : value));
@@ -98,7 +95,7 @@
                 // show loading bar
                 document.getElementById("loading").style.display = "block";
 
-                $.post("https://vserver.legendskyfall.de/kontoauszug/index.php", {token: getValue('token'), filter: getValue('filter'), pages: getValue('pages')}, function(data) {
+                $.post("https://legendskyfall.de/kontoauszug/index.php", {token: getValue('token'), filter: getValue('filter'), pages: getValue('pages')}, function(data) {
                     var countEntries = data.length,
                         playerAccounts = [];
 
@@ -114,6 +111,7 @@
                         }
                     }
 
+                    if(countEntries <= 1 && FAIL > 0) swal("Keine Daten", "Überprüfe den Token auf Richtigkeit.");
                     if(countEntries <= 1 && getValue('filter')) swal("Keine Ergebnisse", "Passe den Filter ggf. entsprechend an.", "info");
 
                     // date convert function to allow compatibility for old and bad browsers
@@ -270,7 +268,7 @@
                                 return false
                             }
                             // encrypt entered token
-                            $.post("https://vserver.legendskyfall.de/kontoauszug/token.php", {token: inputValue}, function(data) {
+                            $.post("https://legendskyfall.de/kontoauszug/token.php", {token: inputValue}, function(data) {
                                 console.log(data);
                                 // save returrned encrypted token
                                 if(data) {
