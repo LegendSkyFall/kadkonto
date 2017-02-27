@@ -55,7 +55,7 @@
             // check if new token submitted
             if(token && token.length) {
                 // encrypt entered token
-                $.post("https://vserver.legendskyfall.de/kontoauszug/token.php", {token: token}, function(data) {
+                $.post("https://legendskyfall.de/kontoauszug/token.php", {token: token}, function(data) {
                     if(data) setValue('token', data);
                     else swal("Oh..", "Da ist etwas schiefgelaufen", "error");
                 });
