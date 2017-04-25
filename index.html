@@ -48,9 +48,10 @@
             swal({
                 title: "Gesetzter Filter",
                 text: ((filter)?
-                    '<i class=\'material-icons\' style=\'border: 1px solid\' onclick=\'removeValue(\"filter\"); swal.close(); readout()\'>delete</i>' +
+                    '<i class=\'material-icons\' style=\'border: 1px solid\' onclick=\'removeValue(\"filter\"); swal.close(); NEW_DATA= true; readout()\'>delete</i>' +
                     '<p>Konto: ' + filter.account + '</p>' +
                     '<p>Handelspartner: ' + filter.partner + '</p>' +
+                    '<p>Beschreibung: ' + filter.description + '</p>' +
                     '<p>Server: ' + filter.server + '</p>' +
                     '<p>Typ: ' + filter.type + '</p>' +
                     '<p>Betrag von: ' + filter.min + ' bis ' + filter.max + ' Kadis</p>'
@@ -97,7 +98,8 @@
 
                 $.post("https://legendskyfall.de/kontoauszug/index.php", {token: getValue('token'), filter: getValue('filter'), pages: getValue('pages')}, function(data) {
                     var countEntries = data.length,
-                        playerAccounts = [];
+                        playerAccounts = [],
+                        someRowMatched = false;
 
                     // save compressed data to localStorage
                     setValue('compressedData', LZString.compressToBase64(JSON.stringify(data)));
@@ -150,6 +152,8 @@
                                     secondaryContent = document.createElement('span'),
                                     dateTime = document.createElement('span'),
                                     amount = document.createElement('span'),
+                                    filterDescription = JSON.parse(getValue('filter', '{}')).description,
+                                    rowMatches = true,
                                     date = convertDate(val.Datum),
                                     dateSeconds = date.getSeconds(),
                                     dateMinutes = date.getMinutes(),
@@ -196,34 +200,54 @@
                                 if(val.Typ === 'Vote(0)' || val.Typ === 'Vote(1)') subTitle.innerHTML = 'Votebelohnung';
                                 else if(val.Typ === 'GEK') subTitle.innerHTML = 'Grundeinkommen';
 
-                                // build new row
-                                dataList.appendChild(line);
-                                line.appendChild(primaryContent);
-                                line.onclick = function () {
-                                     document.querySelector('#entryInfo').MaterialSnackbar.showSnackbar({
-                                        message: detailDateFormat + ' - Konto: ' + val.Konto + ' - Typ: ' + val.Typ + ' Neuer Saldo: ' + val.Saldo + ' Kadis',
-                                        timeout: 7777,
-                                    });
-                                };
-                                primaryContent.appendChild(icon);
-                                primaryContent.appendChild(username);
-                                primaryContent.appendChild(subTitle);
-                                line.appendChild(secondaryContent);
-                                secondaryContent.appendChild(dateTime);
-                                secondaryContent.appendChild(amount);
-
-                                // show message new entries and set received data to true and first start to false
-                                if(key === countEntries - 2 &&!FIRST_START) {
-                                    document.querySelector('#newEntry').MaterialSnackbar.showSnackbar({
-                                        message: 'Es gibt neue Einträge'
-                                    });
+                                // check if search filter was applied
+                                if(filterDescription) {
+                                    // check if current row matches with search filter
+                                    if(!val.Beschreibung || (val.Beschreibung && val.Beschreibung.search(new RegExp(filterDescription, "i")) === -1)) rowMatches = false;
                                 }
-                                if(key === countEntries - 2 && FIRST_START) FIRST_START = false;
-                            } else {
-                                // show message no new entries
-                                if(key === countEntries - 2 && !NEW_DATA) {
+
+                                // only build row if matches with eventually applied search filter
+                                if(rowMatches) {
+                                    someRowMatched = true;
+                                    // build new row
+                                    dataList.appendChild(line);
+                                    line.appendChild(primaryContent);
+                                    line.onclick = function () {
+                                         document.querySelector('#entryInfo').MaterialSnackbar.showSnackbar({
+                                            message: detailDateFormat + ' - Konto: ' + val.Konto + ' - Typ: ' + val.Typ + ' Neuer Saldo: ' + val.Saldo + ' Kadis',
+                                            timeout: 7777,
+                                        });
+                                    };
+                                    primaryContent.appendChild(icon);
+                                    primaryContent.appendChild(username);
+                                    primaryContent.appendChild(subTitle);
+                                    line.appendChild(secondaryContent);
+                                    secondaryContent.appendChild(dateTime);
+                                    secondaryContent.appendChild(amount);
+                                }
+                            }
+                        }
+
+                        // check if on last iteration and show message
+                        if(key + 1=== countEntries) {
+                            if(!NEW_DATA) {
+                                if(!someRowMatched) {
+                                    document.querySelector('#newEntry').MaterialSnackbar.showSnackbar({
+                                        message: 'Für den angegebenen Suchfilter konnten keine Ergebnisse gefunden werden'
+                                    });
+                                } else {
                                     document.querySelector('#newEntry').MaterialSnackbar.showSnackbar({
                                         message: 'Es gibt keine neuen Einträge'
+                                    });
+                                }
+                            } else {
+                                if(!someRowMatched) {
+                                    document.querySelector('#newEntry').MaterialSnackbar.showSnackbar({
+                                        message: 'Für den angegebenen Suchfilter konnten keine Ergebnisse gefunden werden'
+                                    });
+                                } else if(!FIRST_START) {
+                                    document.querySelector('#newEntry').MaterialSnackbar.showSnackbar({
+                                        message: 'Es gibt neue Einträge'
                                     });
                                 }
                             }
