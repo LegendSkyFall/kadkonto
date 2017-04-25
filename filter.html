@@ -52,6 +52,8 @@
                     accountList = document.getElementById("account"),
                     server = document.getElementById("server"),
                     type = document.getElementById("type"),
+                    description = document.getElementById("description"),
+                    descriptionDiv = document.getElementById("descriptionDiv"),
                     min = document.getElementById("min"),
                     minDiv = document.getElementById("minDiv"),
                     max = document.getElementById("max"),
@@ -76,9 +78,11 @@
                     $('#server').trigger("chosen:updated");
                     type.value = filter.type;
                     $('#type').trigger("chosen:updated");
+                    description.value = filter.description;
                     min.value = filter.min;
                     max.value = filter.max;
                     partnerDiv.className += " is-focused";
+                    descriptionDiv.className += " is-focused";
                     minDiv.className += " is-focused";
                     maxDiv.className += " is-focused";
                 }
@@ -90,6 +94,7 @@
                 account = document.getElementById("account"),
                 server = document.getElementById("server"),
                 type = document.getElementById("type"),
+                description = document.getElementById("description"),
                 min = document.getElementById("min"),
                 max = document.getElementById("max");
 
@@ -99,6 +104,7 @@
                 account: account.value,
                 server: server.value,
                 type: type.value,
+                description: description.value,
                 min: min.value,
                 max: max.value
             });
@@ -158,6 +164,10 @@
                       <option value="iConomy">iConomy</option>
                       <option value="KBank">KBank</option>
                     </select>
+                    </div>
+                    <div style="width: 100%; margin-left: 2%" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" id="descriptionDiv">
+                      <input class="mdl-textfield__input" type="text" id="description">
+                      <label class="mdl-textfield__label" for="description">Beschreibung...</label>
                     </div>
                     <div style="width: 100%; margin-left: 2%" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" id="minDiv">
                       <input class="mdl-textfield__input" type="number" pattern="-?[0-9]*(\.[0-9]+)?" id="min">
